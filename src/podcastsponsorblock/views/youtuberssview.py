@@ -8,7 +8,12 @@ from cachetools.keys import hashkey
 from feedgen.entry import FeedEntry
 from feedgen.feed import FeedGenerator
 from flask.typing import ResponseReturnValue
-from flask import Response, current_app, url_for
+from flask import (
+    Response,
+    current_app,
+    url_for,
+    request,
+)
 from flask.views import MethodView
 
 from ..helpers import YoutubePlaylistEpisodeFeed, leniently_validate_youtube_id
@@ -32,7 +37,20 @@ class Thumbnail(TypedDict):
     url: str
 
 
-def generate_episode_entry(episode: EpisodeDetails, config: Configuration) -> FeedEntry:
+def add_host(url: str, host_header: str, config: Configuration) -> str:
+    for allowed_host in config.trusted_hosts:
+        # noinspection HttpUrlsUsage
+        if (
+            allowed_host == f"https://{host_header}"
+            or allowed_host == f"http://{host_header}"
+        ):
+            return allowed_host + url
+    return url
+
+
+def generate_episode_entry(
+    episode: EpisodeDetails, config: Configuration, host: str
+) -> FeedEntry:
     feed_entry = FeedEntry()
     feed_entry.id(episode.id)
     feed_entry.title(episode.title)
@@ -45,8 +63,12 @@ def generate_episode_entry(episode: EpisodeDetails, config: Configuration) -> Fe
     if config.append_auth_param_to_resource_links:
         feed_entry.link(
             Enclosure(
-                href=url_for(
-                    "youtube_media_view", video_id=episode.id, key=config.auth_key
+                href=add_host(
+                    url_for(
+                        "youtube_media_view", video_id=episode.id, key=config.auth_key
+                    ),
+                    host,
+                    config,
                 ),
                 rel="enclosure",
                 type="audio/mp4",
@@ -55,7 +77,9 @@ def generate_episode_entry(episode: EpisodeDetails, config: Configuration) -> Fe
     else:
         feed_entry.link(
             Enclosure(
-                href=url_for("youtube_media_view", video_id=episode.id),
+                href=add_host(
+                    url_for("youtube_media_view", video_id=episode.id), host, config
+                ),
                 rel="enclosure",
                 type="audio/mp4",
             )
@@ -64,7 +88,9 @@ def generate_episode_entry(episode: EpisodeDetails, config: Configuration) -> Fe
 
 
 def populate_feed_generator(
-    playlist_episode_feed: YoutubePlaylistEpisodeFeed, config: Configuration
+    playlist_episode_feed: YoutubePlaylistEpisodeFeed,
+    config: Configuration,
+    host: str,
 ) -> FeedGenerator:
     playlist_details = playlist_episode_feed.playlist_details
     feed_generator = FeedGenerator()
@@ -72,16 +98,20 @@ def populate_feed_generator(
     feed_generator.author(FeedAuthor(name=playlist_details.author.name))
     youtube_playlist_url = f"https://www.youtube.com/playlist?{urllib.parse.urlencode({'list': playlist_details.id})}"
     feed_generator.link(Link(href=youtube_playlist_url, rel="alternate"))
-    feed_generator.logo(playlist_episode_feed.get_logo())
+    feed_generator.logo(playlist_episode_feed.logo)
     feed_generator.subtitle(playlist_details.description or "No description available")
     feed_generator.id(playlist_details.id)
     if config.append_auth_param_to_resource_links:
         feed_generator.link(
             Link(
-                href=url_for(
-                    "youtube_rss_view",
-                    playlist_id=playlist_details.id,
-                    key=config.auth_key,
+                href=add_host(
+                    url_for(
+                        "youtube_rss_view",
+                        playlist_id=playlist_details.id,
+                        key=config.auth_key,
+                    ),
+                    host,
+                    config,
                 ),
                 rel="self",
             )
@@ -89,43 +119,50 @@ def populate_feed_generator(
     else:
         feed_generator.link(
             Link(
-                href=url_for("youtube_rss_view", playlist_id=playlist_details.id),
+                href=add_host(
+                    url_for("youtube_rss_view", playlist_id=playlist_details.id),
+                    host,
+                    config,
+                ),
                 rel="self",
             )
         )
     return feed_generator
 
 
-def generate_rss_feed(
-    episode_feed: YoutubePlaylistEpisodeFeed, config: Configuration
-) -> str:
-    feed_generator = populate_feed_generator(episode_feed, config)
-    for episode in episode_feed:
-        feed_generator.add_entry(generate_episode_entry(episode, config))
-    return feed_generator.rss_str()
-
-
 @cached(
     TTLCache(maxsize=1024, ttl=timedelta(minutes=60).total_seconds()),
-    key=lambda playlist_id, _: hashkey(playlist_id),
+    key=lambda episode_feed, host, _: hashkey(episode_feed.playlist_details.id, host),
 )
-def generate_response(playlist_id: str, config: Configuration) -> ResponseReturnValue:
-    playlist_id = config.aliases.get(playlist_id.lower(), playlist_id)
-    if not leniently_validate_youtube_id(playlist_id):
-        return Response("Invalid playlist ID", status=400)
-    try:
-        episode_feed = YoutubePlaylistEpisodeFeed(
-            playlist_id=playlist_id, config=config
-        )
-    except ValueError:
-        return Response("Playlist does not exist", status=400)
+def generate_rss_feed(
+    episode_feed: YoutubePlaylistEpisodeFeed, host: str, config: Configuration
+) -> str:
     logging.info(
         f"Generating RSS feed for YouTube playlist {episode_feed.playlist_details.id}"
     )
-    return Response(generate_rss_feed(episode_feed, config), mimetype="text/xml")
+    feed_generator = populate_feed_generator(episode_feed, config, host)
+    for episode in episode_feed:
+        feed_generator.add_entry(generate_episode_entry(episode, config, host))
+    return feed_generator.rss_str()
 
 
 class YoutubeRSSView(MethodView):
     def get(self, playlist_id: str) -> ResponseReturnValue:
-        # noinspection PyCallingNonCallable
-        return generate_response(playlist_id, current_app.config["PODCAST_CONFIG"])
+        config: Configuration = current_app.config["PODCAST_CONFIG"]
+        playlist_id = config.aliases.get(playlist_id.lower(), playlist_id)
+        if not leniently_validate_youtube_id(playlist_id):
+            return Response("Invalid playlist ID", status=400)
+        try:
+            episode_feed = YoutubePlaylistEpisodeFeed(
+                playlist_id=playlist_id, config=config
+            )
+        except ValueError:
+            return Response("Playlist does not exist", status=400)
+        if len(config.trusted_hosts) > 0:
+            return Response(
+                generate_rss_feed(episode_feed, request.host, config), mimetype="text/xml"
+            )
+        else:
+            return Response(
+                generate_rss_feed(episode_feed, "", config), mimetype="text/xml"
+            )

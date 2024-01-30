@@ -13,6 +13,7 @@ class Configuration:
     append_auth_param_to_resource_links: bool
     aliases: dict[str, str]
     categories_to_remove: Sequence[str]
+    trusted_hosts: Sequence[str]
 
 
 @dataclass

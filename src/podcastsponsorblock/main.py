@@ -1,9 +1,9 @@
 import logging
 import os
 from pathlib import Path
-from typing import Optional, MutableMapping
+from typing import Optional, MutableMapping, Sequence
 
-from flask import Flask, request, Response
+from flask import Flask, request, Response, Request
 
 from .models import Configuration
 from .views import YoutubeMediaView, YoutubeRSSView, ThumbnailView
@@ -45,6 +45,12 @@ def parse_aliases(source: MutableMapping) -> dict[str, str]:
     return aliases
 
 
+def parse_comma_seperated_value(hostname_str: Optional[str]) -> Sequence[str]:
+    if hostname_str is not None:
+        return hostname_str.split(",")
+    return tuple()
+
+
 def populate_config(source: MutableMapping) -> Configuration:
     try:
         return Configuration(
@@ -58,9 +64,12 @@ def populate_config(source: MutableMapping) -> Configuration:
                 source.get("PODCAST_APPEND_AUTH_PARAM_TO_RESOURCE_LINKS", None)
             ),
             aliases=parse_aliases(source),
-            categories_to_remove=source.get(
-                "PODCAST_CATEGORIES_TO_REMOVE", "sponsor"
-            ).split(","),
+            categories_to_remove=parse_comma_seperated_value(
+                source.get("PODCAST_CATEGORIES_TO_REMOVE", "sponsor")
+            ),
+            trusted_hosts=parse_comma_seperated_value(
+                source.get("PODCAST_TRUSTED_HOSTS", None)
+            ),
         )
     except KeyError as exception:
         # noinspection PyUnresolvedReferences
@@ -70,6 +79,7 @@ def populate_config(source: MutableMapping) -> Configuration:
 def log_config(config: Configuration) -> None:
     logging.info(f"Loaded configuration:")
     logging.info(f"  - Data path: {config.data_path}")
+    logging.info(f"  - Trusted hosts: {config.trusted_hosts}")
     logging.info(f"  - Aliases: {config.aliases}")
     logging.info(f"  - Categories to remove: {config.categories_to_remove}")
     logging.info(
@@ -85,6 +95,9 @@ def log_config(config: Configuration) -> None:
 
 
 def create_app() -> Flask:
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
+    )
     logging.info("Creating app")
     app = Flask(__name__)
     config = populate_config(os.environ)
@@ -92,6 +105,7 @@ def create_app() -> Flask:
         raise ValueError(
             "Cannot append auth param to resource links when query auth is not allowed"
         )
+    log_config(config)
     app.config["PODCAST_CONFIG"] = config
     if config.allow_query_param_auth:
         from . import AuthKeyFilteringLogger
@@ -99,6 +113,10 @@ def create_app() -> Flask:
         AuthKeyFilteringLogger.enabled = config.allow_query_param_auth
     if config.auth_key is not None:
         initialize_authorization(app, config.auth_key, config.allow_query_param_auth)
+    app.request_class.trusted_hosts = list(
+        host.removeprefix("http://").removeprefix("https://")
+        for host in config.trusted_hosts
+    )
     app.add_url_rule(
         "/media/youtube/<string:video_id>",
         view_func=YoutubeMediaView.as_view("youtube_media_view"),

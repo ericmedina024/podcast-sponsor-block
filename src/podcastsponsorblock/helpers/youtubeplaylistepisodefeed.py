@@ -1,12 +1,22 @@
+import logging
+from datetime import timedelta
 from operator import attrgetter
-from typing import Iterable, Optional, Sequence
+from typing import Iterable, Optional, Sequence, TYPE_CHECKING
 
+from cachetools import cached, TTLCache
+from cachetools.keys import hashkey
 from dateutil.parser import isoparse as parse_iso_date
 from flask import url_for
 
 from .. import views
 from ..models import ItemDetails, EpisodeDetails, Author, Configuration
+
 from googleapiclient.discovery import build as build_google_api_client
+
+if TYPE_CHECKING:
+    import googleapiclient
+
+    YoutubeClient = googleapiclient.discovery.Resource
 
 
 def get_best_thumbnail_url(thumbnails: dict) -> str:
@@ -18,8 +28,9 @@ def get_best_thumbnail_url(thumbnails: dict) -> str:
 
 
 def get_channel_details(
-    youtube_client: "googleapiclient.discovery.Resource", channel_id: str
+    youtube_client: "YoutubeClient", channel_id: str
 ) -> Optional[ItemDetails]:
+    # noinspection PyUnresolvedReferences
     channel_request = youtube_client.channels().list(part="snippet", id=channel_id)
     channel_response = channel_request.execute()
     channel_objects = channel_response["items"]
@@ -37,8 +48,9 @@ def get_channel_details(
 
 
 def get_playlist_details(
-    youtube_client: "googleapiclient.discovery.Resource", playlist_id: str
+    youtube_client: "YoutubeClient", playlist_id: str
 ) -> Optional[ItemDetails]:
+    # noinspection PyUnresolvedReferences
     playlist_request = youtube_client.playlists().list(part="snippet", id=playlist_id)
     playlist_response = playlist_request.execute()
     playlist_objects = playlist_response["items"]
@@ -78,6 +90,59 @@ def remove_unavailable_items(playlist_items: Sequence[dict]) -> Sequence[dict]:
     )
 
 
+@cached(
+    TTLCache(maxsize=1024, ttl=timedelta(minutes=60).total_seconds()),
+    key=lambda _, playlist_details: hashkey(playlist_details.id),
+)
+def get_episodes_cached(
+    youtube_client: "YoutubeClient", playlist_details: ItemDetails
+) -> Sequence[EpisodeDetails]:
+    logging.info(f"Grabbing episodes from YouTube playlist {playlist_details.id}")
+    all_playlist_items = []
+    # noinspection PyUnresolvedReferences
+    playlist_items_endpoint = youtube_client.playlistItems()
+    playlist_items_request = playlist_items_endpoint.list(
+        part="snippet,status", playlistId=playlist_details.id, maxResults=50
+    )
+    continue_requesting_playlist_items = True
+    while continue_requesting_playlist_items:
+        playlist_items_response = playlist_items_request.execute()
+        all_playlist_items += playlist_items_response["items"]
+        playlist_items_request = playlist_items_endpoint.list_next(
+            playlist_items_request, playlist_items_response
+        )
+        continue_requesting_playlist_items = playlist_items_request is not None
+    return sorted(
+        map(create_episode_details, remove_unavailable_items(all_playlist_items)),
+        key=attrgetter("published_at"),
+    )
+
+
+@cached(
+    TTLCache(maxsize=1024, ttl=timedelta(minutes=60).total_seconds()),
+    key=lambda _, __, playlist_details: hashkey(playlist_details.id),
+)
+def get_logo_cached(
+    youtube_client: "YoutubeClient",
+    config: Configuration,
+    playlist_details: ItemDetails,
+) -> str:
+    thumbnail_path = views.get_thumbnail_path(playlist_details.id, config)
+    if thumbnail_path is None:
+        channel_details = get_channel_details(
+            youtube_client, playlist_details.author.id
+        )
+        return channel_details.icon_url
+    else:
+        if config.append_auth_param_to_resource_links:
+            return url_for(
+                "thumbnail_view",
+                thumbnail_key=playlist_details.id,
+                key=config.auth_key,
+            )
+        return url_for("thumbnail_view", thumbnail_key=playlist_details.id)
+
+
 class YoutubePlaylistEpisodeFeed:
     def __init__(self, playlist_id: str, config: Configuration):
         self.config = config
@@ -91,40 +156,13 @@ class YoutubePlaylistEpisodeFeed:
         if self.playlist_details is None:
             raise ValueError("Playlist does not exist")
 
-    def get_logo(self) -> str:
-        thumbnail_path = views.get_thumbnail_path(self.playlist_details.id, self.config)
-        if thumbnail_path is None:
-            channel_details = get_channel_details(
-                self.youtube_client, self.playlist_details.author.id
-            )
-            return channel_details.icon_url
-        else:
-            if self.config.append_auth_param_to_resource_links:
-                return url_for(
-                    "thumbnail_view",
-                    thumbnail_key=self.playlist_details.id,
-                    key=self.config.auth_key,
-                )
-            return url_for("thumbnail_view", thumbnail_key=self.playlist_details.id)
+    @property
+    def logo(self) -> str:
+        return get_logo_cached(self.youtube_client, self.config, self.playlist_details)
 
-    def get_episodes(self) -> Sequence[EpisodeDetails]:
-        all_playlist_items = []
-        playlist_items_endpoint = self.youtube_client.playlistItems()
-        playlist_items_request = playlist_items_endpoint.list(
-            part="snippet,status", playlistId=self.playlist_details.id, maxResults=50
-        )
-        continue_requesting_playlist_items = True
-        while continue_requesting_playlist_items:
-            playlist_items_response = playlist_items_request.execute()
-            all_playlist_items += playlist_items_response["items"]
-            playlist_items_request = playlist_items_endpoint.list_next(
-                playlist_items_request, playlist_items_response
-            )
-            continue_requesting_playlist_items = playlist_items_request is not None
-        return sorted(
-            map(create_episode_details, remove_unavailable_items(all_playlist_items)),
-            key=attrgetter("published_at"),
-        )
+    @property
+    def episodes(self) -> Sequence[EpisodeDetails]:
+        return get_episodes_cached(self.youtube_client, self.playlist_details)
 
     def __iter__(self) -> Iterable[EpisodeDetails]:
-        return iter(self.get_episodes())
+        return iter(self.episodes)

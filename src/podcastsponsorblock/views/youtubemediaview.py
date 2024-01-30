@@ -20,7 +20,7 @@ def download_m4a_audio(
     video_id: str, output_path: Path, categories_to_remove: Sequence[str]
 ):
     youtube_dlp_options = {
-        # "quiet": True,
+        "quiet": True,
         "outtmpl": str(output_path.absolute().resolve()),
         "format": "bestaudio[ext=m4a]",
         "postprocessors": [
