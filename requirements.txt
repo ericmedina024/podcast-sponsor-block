@@ -1,0 +1,7 @@
+yt_dlp
+google-api-python-client
+flask
+python-dateutil
+feedgen==0.9.0 # v1.0 has a bug with link elements: https://github.com/lkiesow/python-feedgen/issues/135
+cachetools
+gunicorn
