@@ -1,7 +1,7 @@
 import logging
 import os
 from pathlib import Path
-from typing import Optional, MutableMapping, Sequence, Mapping
+from typing import Optional, MutableMapping
 
 from flask import Flask, request, Response
 
@@ -41,7 +41,7 @@ def parse_aliases(source: MutableMapping) -> dict[str, str]:
     prefix = "PODCAST_ALIAS_"
     for key, value in source.items():
         if key.startswith(prefix):
-            aliases[key[len(prefix):].lower()] = value
+            aliases[key[len(prefix) :].lower()] = value
     return aliases
 
 
@@ -51,10 +51,16 @@ def populate_config(source: MutableMapping) -> Configuration:
             youtube_api_key=source.pop("PODCAST_YOUTUBE_API_KEY"),
             auth_key=source.pop("PODCAST_AUTH_KEY", None),
             data_path=Path(source["PODCAST_DATA_PATH"]).absolute().resolve(),
-            allow_query_param_auth=is_true(source.get("PODCAST_ALLOW_QUERY_PARAM_AUTH", None)),
-            append_auth_param_to_resource_links=is_true(source.get("PODCAST_APPEND_AUTH_PARAM_TO_RESOURCE_LINKS", None)),
+            allow_query_param_auth=is_true(
+                source.get("PODCAST_ALLOW_QUERY_PARAM_AUTH", None)
+            ),
+            append_auth_param_to_resource_links=is_true(
+                source.get("PODCAST_APPEND_AUTH_PARAM_TO_RESOURCE_LINKS", None)
+            ),
             aliases=parse_aliases(source),
-            categories_to_remove=source.get("PODCAST_CATEGORIES_TO_REMOVE", "sponsor").split(",")
+            categories_to_remove=source.get(
+                "PODCAST_CATEGORIES_TO_REMOVE", "sponsor"
+            ).split(","),
         )
     except KeyError as exception:
         # noinspection PyUnresolvedReferences
@@ -66,10 +72,16 @@ def log_config(config: Configuration) -> None:
     logging.info(f"  - Data path: {config.data_path}")
     logging.info(f"  - Aliases: {config.aliases}")
     logging.info(f"  - Categories to remove: {config.categories_to_remove}")
-    logging.info(f"  - YouTube key: {'(configured)' if config.auth_key is not None else ''}")
-    logging.info(f"  - Auth key: {'(configured)' if config.auth_key is not None else ''}")
+    logging.info(
+        f"  - YouTube key: {'(configured)' if config.auth_key is not None else ''}"
+    )
+    logging.info(
+        f"  - Auth key: {'(configured)' if config.auth_key is not None else ''}"
+    )
     logging.info(f"  - Allow query parameter auth: {config.allow_query_param_auth}")
-    logging.info(f"  - Append auth parameter to resource links: {config.append_auth_param_to_resource_links}")
+    logging.info(
+        f"  - Append auth parameter to resource links: {config.append_auth_param_to_resource_links}"
+    )
 
 
 def create_app() -> Flask:
@@ -77,10 +89,13 @@ def create_app() -> Flask:
     app = Flask(__name__)
     config = populate_config(os.environ)
     if not config.allow_query_param_auth and config.append_auth_param_to_resource_links:
-        raise ValueError("Cannot append auth param to resource links when query auth is not allowed")
+        raise ValueError(
+            "Cannot append auth param to resource links when query auth is not allowed"
+        )
     app.config["PODCAST_CONFIG"] = config
     if config.allow_query_param_auth:
         from . import AuthKeyFilteringLogger
+
         AuthKeyFilteringLogger.enabled = config.allow_query_param_auth
     if config.auth_key is not None:
         initialize_authorization(app, config.auth_key, config.allow_query_param_auth)

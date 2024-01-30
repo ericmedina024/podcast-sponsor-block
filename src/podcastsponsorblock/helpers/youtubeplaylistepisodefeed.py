@@ -100,7 +100,11 @@ class YoutubePlaylistEpisodeFeed:
             return channel_details.icon_url
         else:
             if self.config.append_auth_param_to_resource_links:
-                return url_for("thumbnail_view", thumbnail_key=self.playlist_details.id, key=self.config.auth_key)
+                return url_for(
+                    "thumbnail_view",
+                    thumbnail_key=self.playlist_details.id,
+                    key=self.config.auth_key,
+                )
             return url_for("thumbnail_view", thumbnail_key=self.playlist_details.id)
 
     def get_episodes(self) -> Sequence[EpisodeDetails]:

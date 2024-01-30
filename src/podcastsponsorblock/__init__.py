@@ -18,7 +18,11 @@ class AuthKeyFilteringLogger(GunicornLogger):
                 clean_value_parts = []
                 split_value = value.split("&")
                 for part in split_value:
-                    clean_value_parts.append(AuthKeyFilteringLogger.KEY_PARAM_PATTERN.sub(r"\g<1>=redacted", part))
+                    clean_value_parts.append(
+                        AuthKeyFilteringLogger.KEY_PARAM_PATTERN.sub(
+                            r"\g<1>=redacted", part
+                        )
+                    )
                 atoms[atom] = "&".join(clean_value_parts)
         return atoms
 

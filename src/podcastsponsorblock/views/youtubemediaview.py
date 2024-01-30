@@ -20,7 +20,7 @@ def download_m4a_audio(
     video_id: str, output_path: Path, categories_to_remove: Sequence[str]
 ):
     youtube_dlp_options = {
-        #"quiet": True,
+        # "quiet": True,
         "outtmpl": str(output_path.absolute().resolve()),
         "format": "bestaudio[ext=m4a]",
         "postprocessors": [
@@ -65,17 +65,17 @@ class YoutubeMediaView(MethodView):
         with self.video_download_locks[validated_video_id]:
             if audio_output_path.exists():
                 return send_file(audio_output_path)
-            logging.info(f"Downloading audio from Youtube video {validated_video_id}")
+            logging.info(f"Downloading audio from YouTube video {validated_video_id}")
             try:
                 download_m4a_audio(
                     validated_video_id,
                     audio_output_path,
-                    categories_to_remove=config.categories_to_remove
+                    categories_to_remove=config.categories_to_remove,
                 )
                 return send_file(audio_output_path)
             except DownloadError as exception:
                 logging.exception(
-                    f"Failed to download audio for Youtube video {validated_video_id}",
+                    f"Failed to download audio for YouTube video {validated_video_id}",
                     exception,
                 )
                 return Response("Failed to download audio", status=500)

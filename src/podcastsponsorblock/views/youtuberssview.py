@@ -120,7 +120,7 @@ def generate_response(playlist_id: str, config: Configuration) -> ResponseReturn
     except ValueError:
         return Response("Playlist does not exist", status=400)
     logging.info(
-        f"Generating RSS feed for Youtube playlist {episode_feed.playlist_details.id}"
+        f"Generating RSS feed for YouTube playlist {episode_feed.playlist_details.id}"
     )
     return Response(generate_rss_feed(episode_feed, config), mimetype="text/xml")
 
