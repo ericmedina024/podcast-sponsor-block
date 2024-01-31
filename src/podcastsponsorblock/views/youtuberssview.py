@@ -24,6 +24,11 @@ class FeedAuthor(TypedDict):
     name: str
 
 
+class Image(TypedDict):
+    url: str
+    link: str
+
+
 class Link(TypedDict):
     href: str
     rel: str
@@ -95,7 +100,12 @@ def populate_feed_generator(
     feed_generator.author(FeedAuthor(name=playlist_details.author.name))
     youtube_playlist_url = f"https://www.youtube.com/playlist?{urllib.parse.urlencode({'list': playlist_details.id})}"
     feed_generator.link(Link(href=youtube_playlist_url, rel="alternate"))
-    feed_generator.logo(add_host(playlist_episode_feed.logo, host, config))
+    feed_generator.image(
+        **Image(
+            url=add_host(playlist_episode_feed.logo, host, config),
+            link=youtube_playlist_url,
+        )
+    )
     feed_generator.subtitle(playlist_details.description or "No description available")
     feed_generator.id(playlist_details.id)
     if config.append_auth_param_to_resource_links:
