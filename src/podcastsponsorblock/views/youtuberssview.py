@@ -160,7 +160,8 @@ class YoutubeRSSView(MethodView):
             return Response("Playlist does not exist", status=400)
         if len(config.trusted_hosts) > 0:
             return Response(
-                generate_rss_feed(episode_feed, request.host, config), mimetype="text/xml"
+                generate_rss_feed(episode_feed, request.host, config),
+                mimetype="text/xml",
             )
         else:
             return Response(
