@@ -37,13 +37,10 @@ class Thumbnail(TypedDict):
     url: str
 
 
-def add_host(url: str, host_header: str, config: Configuration) -> str:
+def add_host(url: str, host: str, config: Configuration) -> str:
     for allowed_host in config.trusted_hosts:
         # noinspection HttpUrlsUsage
-        if (
-            allowed_host == f"https://{host_header}"
-            or allowed_host == f"http://{host_header}"
-        ):
+        if allowed_host == f"https://{host}" or allowed_host == f"http://{host}":
             return allowed_host + url
     return url
 
@@ -58,7 +55,7 @@ def generate_episode_entry(
     feed_entry.author(FeedAuthor(name=episode.author.name))
     feed_entry.load_extension("media")
     # noinspection PyUnresolvedReferences
-    feed_entry.media.thumbnail(Thumbnail(url=episode.icon_url))
+    feed_entry.media.thumbnail(Thumbnail(url=add_host(episode.icon_url, host, config)))
     feed_entry.published(episode.published_at)
     if config.append_auth_param_to_resource_links:
         feed_entry.link(
@@ -98,7 +95,7 @@ def populate_feed_generator(
     feed_generator.author(FeedAuthor(name=playlist_details.author.name))
     youtube_playlist_url = f"https://www.youtube.com/playlist?{urllib.parse.urlencode({'list': playlist_details.id})}"
     feed_generator.link(Link(href=youtube_playlist_url, rel="alternate"))
-    feed_generator.logo(playlist_episode_feed.logo)
+    feed_generator.logo(add_host(playlist_episode_feed.logo, host, config))
     feed_generator.subtitle(playlist_details.description or "No description available")
     feed_generator.id(playlist_details.id)
     if config.append_auth_param_to_resource_links:
@@ -132,10 +129,10 @@ def populate_feed_generator(
 
 @cached(
     TTLCache(maxsize=1024, ttl=timedelta(minutes=60).total_seconds()),
-    key=lambda episode_feed, host, _: hashkey(episode_feed.playlist_details.id, host),
+    key=lambda episode_feed, _, host: hashkey(episode_feed.playlist_details.id, host),
 )
 def generate_rss_feed(
-    episode_feed: YoutubePlaylistEpisodeFeed, host: str, config: Configuration
+    episode_feed: YoutubePlaylistEpisodeFeed, config: Configuration, host: str
 ) -> str:
     logging.info(
         f"Generating RSS feed for YouTube playlist {episode_feed.playlist_details.id}"
@@ -160,10 +157,10 @@ class YoutubeRSSView(MethodView):
             return Response("Playlist does not exist", status=400)
         if len(config.trusted_hosts) > 0:
             return Response(
-                generate_rss_feed(episode_feed, request.host, config),
+                generate_rss_feed(episode_feed, config, request.host),
                 mimetype="text/xml",
             )
         else:
             return Response(
-                generate_rss_feed(episode_feed, "", config), mimetype="text/xml"
+                generate_rss_feed(episode_feed, config, ""), mimetype="text/xml"
             )
