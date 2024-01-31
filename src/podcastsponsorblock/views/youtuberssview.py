@@ -43,7 +43,7 @@ class Thumbnail(TypedDict):
 
 
 def is_absolute(url: str) -> bool:
-    return urlparse(url).netloc is not ""
+    return urlparse(url).netloc != ""
 
 
 def add_host(url: str, host: str, config: Configuration) -> str:
