@@ -1,5 +1,5 @@
 import logging
-import urllib.parse
+from urllib.parse import urlparse, urlencode
 from datetime import timedelta
 from typing import TypedDict
 
@@ -40,6 +40,10 @@ class Enclosure(Link):
 
 class Thumbnail(TypedDict):
     url: str
+
+
+def is_absolute(url: str) -> bool:
+    return urlparse(url).netloc is not ""
 
 
 def add_host(url: str, host: str, config: Configuration) -> str:
@@ -98,11 +102,16 @@ def populate_feed_generator(
     feed_generator = FeedGenerator()
     feed_generator.title(playlist_details.title)
     feed_generator.author(FeedAuthor(name=playlist_details.author.name))
-    youtube_playlist_url = f"https://www.youtube.com/playlist?{urllib.parse.urlencode({'list': playlist_details.id})}"
+    youtube_playlist_url = (
+        f"https://www.youtube.com/playlist?{urlencode({'list': playlist_details.id})}"
+    )
     feed_generator.link(Link(href=youtube_playlist_url, rel="alternate"))
+    podcast_logo_url = playlist_episode_feed.logo
+    if not is_absolute(podcast_logo_url):
+        podcast_logo_url = add_host(podcast_logo_url, host, config)
     feed_generator.image(
         **Image(
-            url=add_host(playlist_episode_feed.logo, host, config),
+            url=podcast_logo_url,
             link=youtube_playlist_url,
         )
     )
