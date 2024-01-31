@@ -25,7 +25,7 @@ services:
     env_file:
       - <config.env path>
     volumes:
-      - "<host_header data path>:<PODCAST_DATA_PATH>"
+      - "<host data path>:<PODCAST_DATA_PATH>"
     ports:
-      - "<host_header port>:8080"
+      - "<host port>:8080"
 ```
