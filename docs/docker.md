@@ -11,7 +11,7 @@ podcast-sponsor-block can be run as a container by following these steps:
     `docker run -it -v <host data path>:<PODCAST_DATA_PATH> --env-file <env file path> -p <host port>:8080 
     podcast-sponsor-block`
 
-You can also run podcast-sponsor-block via `docker-compose`. Below is an example `compose.yml`. Be sure to replace the
+You can also run podcast-sponsor-block via `docker-compose`. Below is an example `docker-compose.yml`. Be sure to replace the
 parts surrounded in `<>` with your values!
 ```yaml
 version: '3'
