@@ -32,7 +32,7 @@ class Image(TypedDict):
 
 class Link(TypedDict):
     href: str
-    rel: str
+    rel: Optional[str]
     type: Optional[str]
 
 
@@ -119,6 +119,7 @@ def populate_feed_generator(
     podcast_logo_url = playlist_episode_feed.logo
     if not is_absolute(podcast_logo_url):
         podcast_logo_url = add_host(podcast_logo_url, generator_options)
+    feed_generator.link(Link(href=youtube_playlist_url, rel=None, type=None))
     feed_generator.image(
         **Image(
             url=podcast_logo_url,
@@ -137,7 +138,7 @@ def populate_feed_generator(
             podcast_feed_generator.itunes_category(escape_for_xml(podcast_config.itunes_category))
         if podcast_feed_generator.itunes_image() is None:
             podcast_feed_generator.itunes_image("https://is1-ssl.mzstatic.com/image/thumb/Podcasts116/v4/aa/2a/c8/aa2ac8b3-8f4e-d921-7046-9a910be576b5/mza_11213880277667169347.jpg/3000x3000bb.jpg")
-    feed_generator.link(Link(href=youtube_playlist_url, rel="alternate"))
+    logging.info(feed_generator._FeedGenerator__rss_link)
     if podcast_config is not None and podcast_config.description is not None:
         feed_generator.subtitle(escape_for_xml(podcast_config.description))
     elif playlist_details.description is not None:
@@ -145,32 +146,6 @@ def populate_feed_generator(
     else:
         feed_generator.subtitle("No description available")
     feed_generator.id(playlist_details.id)
-    if generator_options.service_config.append_auth_param_to_resource_links:
-        feed_generator.link(
-            Link(
-                href=add_host(
-                    url_for(
-                        "youtube_rss_view",
-                        playlist_id=playlist_details.id,
-                        key=generator_options.service_config.auth_key,
-                    ),
-                    generator_options
-                ),
-                rel="self",
-                type="application/rss+xml"
-            )
-        )
-    else:
-        feed_generator.link(
-            Link(
-                href=add_host(
-                    url_for("youtube_rss_view", playlist_id=playlist_details.id),
-                    generator_options
-                ),
-                rel="self",
-                type="application/rss+xml"
-            )
-        )
     return feed_generator
 
 
