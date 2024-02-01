@@ -5,7 +5,16 @@ from typing import Optional, Sequence
 
 
 @dataclass
-class Configuration:
+class PodcastConfig:
+    id: str
+    language: Optional[str]
+    description: Optional[str]
+    itunes_category: Optional[str]
+    explicit: Optional[bool]
+
+
+@dataclass
+class ServiceConfig:
     youtube_api_key: str
     auth_key: Optional[str]
     data_path: Path
@@ -14,6 +23,7 @@ class Configuration:
     aliases: dict[str, str]
     categories_to_remove: Sequence[str]
     trusted_hosts: Sequence[str]
+    podcast_configs: dict[str, PodcastConfig]
 
 
 @dataclass
@@ -26,7 +36,7 @@ class Author:
 class ItemDetails:
     id: str
     title: str
-    description: str
+    description: Optional[str]
     author: Author
     icon_url: str
 

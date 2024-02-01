@@ -9,7 +9,7 @@ from dateutil.parser import isoparse as parse_iso_date
 from flask import url_for
 
 from .. import views
-from ..models import ItemDetails, EpisodeDetails, Author, Configuration
+from ..models import ItemDetails, EpisodeDetails, Author, ServiceConfig
 
 from googleapiclient.discovery import build as build_google_api_client
 
@@ -90,7 +90,9 @@ def remove_unavailable_items(playlist_items: Sequence[dict]) -> Sequence[dict]:
     )
 
 
-def remove_duplicates(objects: Sequence[Any], key_getter: Callable[[Any], Hashable]) -> Sequence[Any]:
+def remove_duplicates(
+    objects: Sequence[Any], key_getter: Callable[[Any], Hashable]
+) -> Sequence[Any]:
     unique_object_dict = {key_getter(obj): obj for obj in objects}
     return tuple(unique_object_dict.values())
 
@@ -130,7 +132,7 @@ def get_episodes_cached(
 )
 def get_logo_cached(
     youtube_client: "YoutubeClient",
-    config: Configuration,
+    config: ServiceConfig,
     playlist_details: ItemDetails,
 ) -> str:
     thumbnail_path = views.get_thumbnail_path(playlist_details.id, config)
@@ -150,7 +152,7 @@ def get_logo_cached(
 
 
 class YoutubePlaylistEpisodeFeed:
-    def __init__(self, playlist_id: str, config: Configuration):
+    def __init__(self, playlist_id: str, config: ServiceConfig):
         self.config = config
         self.youtube_client = build_google_api_client(
             "youtube",

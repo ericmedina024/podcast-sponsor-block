@@ -13,7 +13,7 @@ from ..helpers import leniently_validate_youtube_id
 from googleapiclient.discovery import build as build_google_api_client
 import threading
 
-from ..models import Configuration
+from ..models import ServiceConfig
 
 
 def download_m4a_audio(
@@ -35,7 +35,7 @@ def download_m4a_audio(
         youtube_dlp_client.download((f"https://www.youtube.com/watch?v={video_id}",))
 
 
-def validate_youtube_video_id(video_id: str, config: Configuration) -> Optional[str]:
+def validate_youtube_video_id(video_id: str, config: ServiceConfig) -> Optional[str]:
     youtube_client = build_google_api_client(
         "youtube", "v3", developerKey=config.youtube_api_key, cache_discovery=False
     )
@@ -54,16 +54,16 @@ class YoutubeMediaView(MethodView):
     def get(self, video_id: str) -> ResponseReturnValue:
         if not leniently_validate_youtube_id(video_id):
             return Response("Invalid video ID", status=400)
-        config: Configuration = current_app.config["PODCAST_CONFIG"]
+        config: ServiceConfig = current_app.config["PODCAST_SERVICE_CONFIG"]
         validated_video_id = validate_youtube_video_id(video_id, config)
         if validated_video_id is None:
             return Response("Video ID does not exist", status=400)
         audio_output_path = config.data_path / "audio" / f"{validated_video_id}.m4a"
-        if audio_output_path.exists():
+        if audio_output_path.exists() and audio_output_path.is_file():
             return send_file(audio_output_path)
         # We need a per-video_id lock here to prevent two requests from causing the same video to download twice
         with self.video_download_locks[validated_video_id]:
-            if audio_output_path.exists():
+            if audio_output_path.exists() and audio_output_path.is_file():
                 return send_file(audio_output_path)
             logging.info(f"Downloading audio from YouTube video {validated_video_id}")
             try:
