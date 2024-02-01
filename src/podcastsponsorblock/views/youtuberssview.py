@@ -33,6 +33,7 @@ class Image(TypedDict):
 class Link(TypedDict):
     href: str
     rel: str
+    type: Optional[str]
 
 
 class Enclosure(TypedDict):
@@ -125,8 +126,8 @@ def populate_feed_generator(
         )
     )
     podcast_config = generator_options.podcast_config
-    # noinspection PyUnresolvedReferences
     if podcast_config is not None:
+        # noinspection PyUnresolvedReferences
         podcast_feed_generator = feed_generator.podcast
         if podcast_config.language is not None:
             feed_generator.language(escape_for_xml(podcast_config.language))
@@ -156,6 +157,7 @@ def populate_feed_generator(
                     generator_options
                 ),
                 rel="self",
+                type="application/rss+xml"
             )
         )
     else:
@@ -166,6 +168,7 @@ def populate_feed_generator(
                     generator_options
                 ),
                 rel="self",
+                type="application/rss+xml"
             )
         )
     return feed_generator
