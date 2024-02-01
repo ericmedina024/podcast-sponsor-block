@@ -20,4 +20,5 @@ another RSS source but discovered a few problems:
 
 ### How do I run it?
 The recommended way to run podcast-sponsor-block is as a Docker container. See
-[docs/docker.md](docs/docker.md) for more information.
+[docs/docker.md](docs/docker.md) for more information. Once it's running, see [docs/usage.md](docs/usage.md) for
+usage instructions.
