@@ -16,7 +16,7 @@ def initialize_authorization(
     def require_authentication():
         if (
             allow_query_param_auth
-            and request.method == "GET"
+            and request.args is not None
             and request.args.get("key") == key
         ):
             return
