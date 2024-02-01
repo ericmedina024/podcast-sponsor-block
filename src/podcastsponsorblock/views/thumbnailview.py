@@ -46,4 +46,5 @@ class ThumbnailView(MethodView):
             return Response("Thumbnail not found", status=404)
         return send_file(thumbnail_path)
 
-    head = get
+    def head(self, thumbnail_key: str) -> ResponseReturnValue:
+        return self.get(thumbnail_key)
