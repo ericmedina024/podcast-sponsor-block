@@ -80,7 +80,8 @@ def generate_episode_entry(
             **Enclosure(
                 url=add_host(
                     url_for(
-                        "youtube_media_view", video_id=episode.id, key=generator_options.service_config.auth_key
+                        # Apple podcasts requires the file extension
+                        "youtube_media_view", video_id=f"{episode.id}.m4a", key=generator_options.service_config.auth_key
                     ),
                     generator_options
                 ),
@@ -92,7 +93,8 @@ def generate_episode_entry(
         feed_entry.link(
             Enclosure(
                 url=add_host(
-                    url_for("youtube_media_view", video_id=episode.id), generator_options
+                    # Apple podcasts requires the file extension
+                    url_for("youtube_media_view", video_id=f"{episode.id}.m4a"), generator_options
                 ),
                 type="audio/mp4",  # Apple podcasts requires this instead of audio/mp4
                 length="0"

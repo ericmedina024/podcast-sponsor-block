@@ -52,6 +52,8 @@ class YoutubeMediaView(MethodView):
         self.video_download_locks = defaultdict(threading.Lock)
 
     def get(self, video_id: str) -> ResponseReturnValue:
+        # Apple podcasts requires the file extension, but we don't want it and need to remove it if present
+        video_id = video_id.removesuffix(".m4a")
         if not leniently_validate_youtube_id(video_id):
             return Response("Invalid video ID", status=400)
         config: ServiceConfig = current_app.config["PODCAST_SERVICE_CONFIG"]
