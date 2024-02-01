@@ -76,7 +76,6 @@ def generate_episode_entry(
     feed_entry.author(FeedAuthor(name=episode.author.name))
     feed_entry.load_extension("media")
     # noinspection PyUnresolvedReferences
-    feed_entry.media.thumbnail(Thumbnail(url=add_host(episode.icon_url, generator_options)))
     feed_entry.published(episode.published_at)
     if generator_options.service_config.append_auth_param_to_resource_links:
         feed_entry.enclosure(
