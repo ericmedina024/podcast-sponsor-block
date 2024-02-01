@@ -1,4 +1,3 @@
-import logging
 from pathlib import Path
 from typing import Optional, Sequence
 
@@ -46,3 +45,5 @@ class ThumbnailView(MethodView):
         if thumbnail_path is None:
             return Response("Thumbnail not found", status=404)
         return send_file(thumbnail_path)
+
+    head = get
