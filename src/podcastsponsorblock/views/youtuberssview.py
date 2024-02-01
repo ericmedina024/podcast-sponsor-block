@@ -74,8 +74,6 @@ def generate_episode_entry(
     feed_entry.title(episode.title)
     feed_entry.description(episode.description)
     feed_entry.author(FeedAuthor(name=episode.author.name))
-    feed_entry.load_extension("media")
-    # noinspection PyUnresolvedReferences
     feed_entry.published(episode.published_at)
     if generator_options.service_config.append_auth_param_to_resource_links:
         feed_entry.enclosure(
@@ -86,7 +84,7 @@ def generate_episode_entry(
                     ),
                     generator_options
                 ),
-                type="audio/mp4",
+                type="audio/x-m4a",  # Apple podcasts requires this instead of audio/mp4
                 length="0"
             )
         )
@@ -96,7 +94,7 @@ def generate_episode_entry(
                 url=add_host(
                     url_for("youtube_media_view", video_id=episode.id), generator_options
                 ),
-                type="audio/mp4",
+                type="audio/mp4",  # Apple podcasts requires this instead of audio/mp4
                 length="0"
             )
         )
