@@ -1,7 +1,7 @@
 import logging
 from datetime import timedelta
 from operator import attrgetter
-from typing import Iterable, Optional, Sequence, TYPE_CHECKING
+from typing import Iterable, Optional, Sequence, TYPE_CHECKING, Any, Callable, Hashable
 
 from cachetools import cached, TTLCache
 from cachetools.keys import hashkey
@@ -90,6 +90,11 @@ def remove_unavailable_items(playlist_items: Sequence[dict]) -> Sequence[dict]:
     )
 
 
+def remove_duplicates(objects: Sequence[Any], key_getter: Callable[[Any], Hashable]) -> Sequence[Any]:
+    unique_object_dict = {key_getter(obj): obj for obj in objects}
+    return tuple(unique_object_dict.values())
+
+
 @cached(
     TTLCache(maxsize=1024, ttl=timedelta(minutes=60).total_seconds()),
     key=lambda _, playlist_details: hashkey(playlist_details.id),
@@ -112,10 +117,11 @@ def get_episodes_cached(
             playlist_items_request, playlist_items_response
         )
         continue_requesting_playlist_items = playlist_items_request is not None
-    return sorted(
+    sorted_playlist_episodes = sorted(
         map(create_episode_details, remove_unavailable_items(all_playlist_items)),
         key=attrgetter("published_at"),
     )
+    return remove_duplicates(sorted_playlist_episodes, attrgetter("id"))
 
 
 @cached(
