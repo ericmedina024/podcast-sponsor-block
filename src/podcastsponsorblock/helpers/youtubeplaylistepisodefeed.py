@@ -9,7 +9,7 @@ from dateutil.parser import isoparse as parse_iso_date
 from flask import url_for
 
 from .. import views
-from ..models import ItemDetails, EpisodeDetails, Author, ServiceConfig
+from ..models import ItemDetails, EpisodeDetails, Author, FeedOptions
 
 from googleapiclient.discovery import build as build_google_api_client
 
@@ -132,32 +132,32 @@ def get_episodes_cached(
 )
 def get_logo_cached(
     youtube_client: "YoutubeClient",
-    config: ServiceConfig,
+    feed_options: FeedOptions,
     playlist_details: ItemDetails,
 ) -> str:
-    thumbnail_path = views.get_thumbnail_path(playlist_details.id, config)
+    thumbnail_path = views.get_thumbnail_path(playlist_details.id, feed_options)
     if thumbnail_path is None:
         channel_details = get_channel_details(
             youtube_client, playlist_details.author.id
         )
         return channel_details.icon_url
     else:
-        if config.append_auth_param_to_resource_links:
+        if feed_options.service_config.append_auth_param_to_resource_links:
             return url_for(
                 "thumbnail_view",
                 thumbnail_key=playlist_details.id,
-                key=config.auth_key,
+                key=feed_options.service_config.auth_key,
             )
         return url_for("thumbnail_view", thumbnail_key=playlist_details.id)
 
 
 class YoutubePlaylistEpisodeFeed:
-    def __init__(self, playlist_id: str, config: ServiceConfig):
-        self.config = config
+    def __init__(self, playlist_id: str, feed_options: FeedOptions):
+        self.feed_options = feed_options
         self.youtube_client = build_google_api_client(
             "youtube",
             "v3",
-            developerKey=self.config.youtube_api_key,
+            developerKey=self.feed_options.service_config.youtube_api_key,
             cache_discovery=False,
         )
         self.playlist_details = get_playlist_details(self.youtube_client, playlist_id)
@@ -166,7 +166,7 @@ class YoutubePlaylistEpisodeFeed:
 
     @property
     def logo(self) -> str:
-        return get_logo_cached(self.youtube_client, self.config, self.playlist_details)
+        return get_logo_cached(self.youtube_client, self.feed_options, self.playlist_details)
 
     @property
     def episodes(self) -> Sequence[EpisodeDetails]:

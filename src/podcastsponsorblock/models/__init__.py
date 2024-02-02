@@ -11,6 +11,7 @@ class PodcastConfig:
     description: Optional[str]
     itunes_category: Optional[str]
     explicit: Optional[bool]
+    itunes_id: Optional[str]
 
 
 @dataclass
@@ -24,6 +25,13 @@ class ServiceConfig:
     categories_to_remove: Sequence[str]
     trusted_hosts: Sequence[str]
     podcast_configs: dict[str, PodcastConfig]
+
+
+@dataclass
+class FeedOptions:
+    service_config: ServiceConfig
+    podcast_config: Optional[PodcastConfig]
+    host: str
 
 
 @dataclass

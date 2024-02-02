@@ -67,6 +67,7 @@ def parse_podcast_configs(config_path: Path) -> dict[str, PodcastConfig]:
             description=section_values.get("description"),
             itunes_category=section_values.get("itunes_category"),
             explicit=section_values.getboolean("explicit"),
+            itunes_id=section_values.get("itunes_id")
         )
     return podcast_configs
 

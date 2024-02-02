@@ -5,7 +5,7 @@ from flask import current_app, send_file, Response
 from flask.typing import ResponseReturnValue
 from flask.views import MethodView
 
-from ..models import ServiceConfig
+from ..models import FeedOptions
 
 
 def compute_potential_thumbnail_stems(
@@ -20,12 +20,12 @@ def compute_potential_thumbnail_stems(
     return tuple(name.casefold() for name in all_potential_thumbnail_names)
 
 
-def get_thumbnail_path(thumbnail_key: str, config: ServiceConfig) -> Optional[Path]:
-    thumbnail_directory = config.data_path / "thumbnails"
+def get_thumbnail_path(thumbnail_key: str, feed_options: FeedOptions) -> Optional[Path]:
+    thumbnail_directory = feed_options.service_config.data_path / "thumbnails"
     if not thumbnail_directory.exists() or not thumbnail_directory.is_dir():
         return None
     all_potential_thumbnail_stems = compute_potential_thumbnail_stems(
-        thumbnail_key, config.aliases
+        thumbnail_key, feed_options.service_config.aliases
     )
     for candidate_thumbnail in thumbnail_directory.iterdir():
         if (
