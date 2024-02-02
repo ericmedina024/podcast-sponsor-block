@@ -83,7 +83,7 @@ def generate_episode_entry(
             )
         )
     else:
-        feed_entry.link(
+        feed_entry.enclosure(
             **Enclosure(
                 url=add_host(
                     # Apple podcasts requires the file extension
