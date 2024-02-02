@@ -18,11 +18,7 @@ from flask import (
 from flask.views import MethodView
 
 from ..helpers import YoutubePlaylistEpisodeFeed, leniently_validate_youtube_id, escape_for_xml, get_itunes_artwork
-from ..models import EpisodeDetails, ServiceConfig, PodcastConfig, FeedOptions
-
-
-class FeedAuthor(TypedDict):
-    name: str
+from ..models import EpisodeDetails, ServiceConfig, FeedOptions
 
 
 class Image(TypedDict):
@@ -66,7 +62,6 @@ def generate_episode_entry(
     feed_entry.id(episode.id)
     feed_entry.title(episode.title)
     feed_entry.description(episode.description)
-    feed_entry.author(FeedAuthor(name=episode.author.name))
     feed_entry.published(episode.published_at)
     if generator_options.service_config.append_auth_param_to_resource_links:
         feed_entry.enclosure(
@@ -103,9 +98,6 @@ def populate_feed_generator(
     playlist_details = playlist_episode_feed.playlist_details
     feed_generator = FeedGenerator()
     feed_generator.title(escape_for_xml(playlist_details.title))
-    feed_generator.author(FeedAuthor(name=escape_for_xml(playlist_details.author.name)))
-    feed_generator.load_extension("podcast")
-    podcast_config = generator_options.podcast_config
     youtube_playlist_url = (
         f"https://www.youtube.com/playlist?{urlencode({'list': playlist_details.id})}"
     )
@@ -119,8 +111,11 @@ def populate_feed_generator(
             link=youtube_playlist_url,
         )
     )
+    feed_generator.load_extension("podcast")
+    podcast_config = generator_options.podcast_config
     # noinspection PyUnresolvedReferences
     podcast_feed_generator = feed_generator.podcast
+    podcast_feed_generator.itunes_author(playlist_details.author.name)
     if podcast_config is not None:
         if podcast_config.itunes_id is not None:
             try:
