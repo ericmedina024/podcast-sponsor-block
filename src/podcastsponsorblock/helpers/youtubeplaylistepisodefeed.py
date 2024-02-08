@@ -1,7 +1,7 @@
 import logging
 from datetime import timedelta
 from operator import attrgetter
-from typing import Iterable, Optional, Sequence, TYPE_CHECKING
+from typing import Iterable, Optional, Sequence, TYPE_CHECKING, Any, Callable, Hashable
 
 from cachetools import cached, TTLCache
 from cachetools.keys import hashkey
@@ -9,7 +9,7 @@ from dateutil.parser import isoparse as parse_iso_date
 from flask import url_for
 
 from .. import views
-from ..models import ItemDetails, EpisodeDetails, Author, Configuration
+from ..models import ItemDetails, EpisodeDetails, Author, FeedOptions
 
 from googleapiclient.discovery import build as build_google_api_client
 
@@ -90,6 +90,13 @@ def remove_unavailable_items(playlist_items: Sequence[dict]) -> Sequence[dict]:
     )
 
 
+def remove_duplicates(
+    objects: Sequence[Any], key_getter: Callable[[Any], Hashable]
+) -> Sequence[Any]:
+    unique_object_dict = {key_getter(obj): obj for obj in objects}
+    return tuple(unique_object_dict.values())
+
+
 @cached(
     TTLCache(maxsize=1024, ttl=timedelta(minutes=60).total_seconds()),
     key=lambda _, playlist_details: hashkey(playlist_details.id),
@@ -112,10 +119,11 @@ def get_episodes_cached(
             playlist_items_request, playlist_items_response
         )
         continue_requesting_playlist_items = playlist_items_request is not None
-    return sorted(
+    sorted_playlist_episodes = sorted(
         map(create_episode_details, remove_unavailable_items(all_playlist_items)),
         key=attrgetter("published_at"),
     )
+    return remove_duplicates(sorted_playlist_episodes, attrgetter("id"))
 
 
 @cached(
@@ -124,32 +132,32 @@ def get_episodes_cached(
 )
 def get_logo_cached(
     youtube_client: "YoutubeClient",
-    config: Configuration,
+    feed_options: FeedOptions,
     playlist_details: ItemDetails,
 ) -> str:
-    thumbnail_path = views.get_thumbnail_path(playlist_details.id, config)
+    thumbnail_path = views.get_thumbnail_path(playlist_details.id, feed_options)
     if thumbnail_path is None:
         channel_details = get_channel_details(
             youtube_client, playlist_details.author.id
         )
         return channel_details.icon_url
     else:
-        if config.append_auth_param_to_resource_links:
+        if feed_options.service_config.append_auth_param_to_resource_links:
             return url_for(
                 "thumbnail_view",
                 thumbnail_key=playlist_details.id,
-                key=config.auth_key,
+                key=feed_options.service_config.auth_key,
             )
         return url_for("thumbnail_view", thumbnail_key=playlist_details.id)
 
 
 class YoutubePlaylistEpisodeFeed:
-    def __init__(self, playlist_id: str, config: Configuration):
-        self.config = config
+    def __init__(self, playlist_id: str, feed_options: FeedOptions):
+        self.feed_options = feed_options
         self.youtube_client = build_google_api_client(
             "youtube",
             "v3",
-            developerKey=self.config.youtube_api_key,
+            developerKey=self.feed_options.service_config.youtube_api_key,
             cache_discovery=False,
         )
         self.playlist_details = get_playlist_details(self.youtube_client, playlist_id)
@@ -158,7 +166,7 @@ class YoutubePlaylistEpisodeFeed:
 
     @property
     def logo(self) -> str:
-        return get_logo_cached(self.youtube_client, self.config, self.playlist_details)
+        return get_logo_cached(self.youtube_client, self.feed_options, self.playlist_details)
 
     @property
     def episodes(self) -> Sequence[EpisodeDetails]:

@@ -1,4 +1,3 @@
-import logging
 from pathlib import Path
 from typing import Optional, Sequence
 
@@ -6,7 +5,7 @@ from flask import current_app, send_file, Response
 from flask.typing import ResponseReturnValue
 from flask.views import MethodView
 
-from ..models import Configuration
+from ..models import FeedOptions
 
 
 def compute_potential_thumbnail_stems(
@@ -21,12 +20,12 @@ def compute_potential_thumbnail_stems(
     return tuple(name.casefold() for name in all_potential_thumbnail_names)
 
 
-def get_thumbnail_path(thumbnail_key: str, config: Configuration) -> Optional[Path]:
-    thumbnail_directory = config.data_path / "thumbnails"
-    if not thumbnail_directory.exists():
+def get_thumbnail_path(thumbnail_key: str, feed_options: FeedOptions) -> Optional[Path]:
+    thumbnail_directory = feed_options.service_config.data_path / "thumbnails"
+    if not thumbnail_directory.exists() or not thumbnail_directory.is_dir():
         return None
     all_potential_thumbnail_stems = compute_potential_thumbnail_stems(
-        thumbnail_key, config.aliases
+        thumbnail_key, feed_options.service_config.aliases
     )
     for candidate_thumbnail in thumbnail_directory.iterdir():
         if (
@@ -41,8 +40,11 @@ def get_thumbnail_path(thumbnail_key: str, config: Configuration) -> Optional[Pa
 class ThumbnailView(MethodView):
     def get(self, thumbnail_key: str) -> ResponseReturnValue:
         thumbnail_path = get_thumbnail_path(
-            thumbnail_key, current_app.config["PODCAST_CONFIG"]
+            thumbnail_key, current_app.config["PODCAST_SERVICE_CONFIG"]
         )
         if thumbnail_path is None:
             return Response("Thumbnail not found", status=404)
         return send_file(thumbnail_path)
+
+    def head(self, thumbnail_key: str) -> ResponseReturnValue:
+        return self.get(thumbnail_key)

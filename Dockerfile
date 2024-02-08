@@ -21,6 +21,7 @@ CMD [ \
     "gunicorn", \
     "--log-level=info", \
     "--logger-class=podcastsponsorblock.AuthKeyFilteringLogger", \
+    "--workers=5", \
     "--log-file=-", \
     "--access-logfile=-", \
     "-b=0.0.0.0:8080", \

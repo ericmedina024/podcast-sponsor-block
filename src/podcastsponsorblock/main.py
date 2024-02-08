@@ -1,11 +1,13 @@
+import json
 import logging
 import os
+from configparser import ConfigParser
 from pathlib import Path
 from typing import Optional, MutableMapping, Sequence
 
 from flask import Flask, request, Response, Request
 
-from .models import Configuration
+from .models import ServiceConfig, PodcastConfig
 from .views import YoutubeMediaView, YoutubeRSSView, ThumbnailView
 
 
@@ -16,7 +18,7 @@ def initialize_authorization(
     def require_authentication():
         if (
             allow_query_param_auth
-            and request.method == "GET"
+            and request.args is not None
             and request.args.get("key") == key
         ):
             return
@@ -51,12 +53,32 @@ def parse_comma_seperated_value(hostname_str: Optional[str]) -> Sequence[str]:
     return tuple()
 
 
-def populate_config(source: MutableMapping) -> Configuration:
+def parse_podcast_configs(config_path: Path) -> dict[str, PodcastConfig]:
+    if not config_path.exists() or not config_path.is_file():
+        return dict()
+    config = ConfigParser()
+    config.read(config_path)
+    podcast_configs = dict()
+    for section_name in config.sections():
+        section_values = config[section_name]
+        podcast_configs[section_name] = PodcastConfig(
+            id=section_name,
+            language=section_values.get("language"),
+            description=section_values.get("description"),
+            itunes_category=section_values.get("itunes_category"),
+            explicit=section_values.getboolean("explicit"),
+            itunes_id=section_values.get("itunes_id")
+        )
+    return podcast_configs
+
+
+def populate_service_config(source: MutableMapping) -> ServiceConfig:
+    data_path = Path(source["PODCAST_DATA_PATH"]).absolute().resolve()
     try:
-        return Configuration(
+        return ServiceConfig(
             youtube_api_key=source.pop("PODCAST_YOUTUBE_API_KEY"),
             auth_key=source.pop("PODCAST_AUTH_KEY", None),
-            data_path=Path(source["PODCAST_DATA_PATH"]).absolute().resolve(),
+            data_path=data_path,
             allow_query_param_auth=is_true(
                 source.get("PODCAST_ALLOW_QUERY_PARAM_AUTH", None)
             ),
@@ -70,18 +92,20 @@ def populate_config(source: MutableMapping) -> Configuration:
             trusted_hosts=parse_comma_seperated_value(
                 source.get("PODCAST_TRUSTED_HOSTS", None)
             ),
+            podcast_configs=parse_podcast_configs(data_path / "podcasts.ini")
         )
     except KeyError as exception:
         # noinspection PyUnresolvedReferences
         raise ValueError(f"Missing configuration value: {exception}")
 
 
-def log_config(config: Configuration) -> None:
+def log_service_config(config: ServiceConfig) -> None:
     logging.info(f"Loaded configuration:")
     logging.info(f"  - Data path: {config.data_path}")
     logging.info(f"  - Trusted hosts: {config.trusted_hosts}")
     logging.info(f"  - Aliases: {config.aliases}")
     logging.info(f"  - Categories to remove: {config.categories_to_remove}")
+    logging.info(f"   - Podcast configs: {config.podcast_configs}")
     logging.info(
         f"  - YouTube key: {'(configured)' if config.auth_key is not None else ''}"
     )
@@ -100,13 +124,13 @@ def create_app() -> Flask:
     )
     logging.info("Creating app")
     app = Flask(__name__)
-    config = populate_config(os.environ)
+    config = populate_service_config(os.environ)
     if not config.allow_query_param_auth and config.append_auth_param_to_resource_links:
         raise ValueError(
             "Cannot append auth param to resource links when query auth is not allowed"
         )
-    log_config(config)
-    app.config["PODCAST_CONFIG"] = config
+    log_service_config(config)
+    app.config["PODCAST_SERVICE_CONFIG"] = config
     if config.allow_query_param_auth:
         from . import AuthKeyFilteringLogger
 
