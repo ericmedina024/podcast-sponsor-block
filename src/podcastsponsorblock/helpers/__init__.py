@@ -21,19 +21,27 @@ def transform_artwork_url(artwork_url: str, new_height: int, new_width: int) -> 
 
 @cached(cache=TTLCache(ttl=timedelta(minutes=60).total_seconds(), maxsize=1024))
 def get_itunes_artwork(itunes_id: str) -> str:
-    itunes_response = requests.get("https://itunes.apple.com/lookup?id=", params={"id": itunes_id})
+    itunes_response = requests.get(
+        "https://itunes.apple.com/lookup?id=", params={"id": itunes_id}
+    )
     if itunes_response.status_code != 200:
         raise ValueError(f"Invalid iTunes ID: {itunes_id}")
     itunes_results = itunes_response.json().get("results", tuple())
     if len(itunes_results) != 1:
-        raise ValueError(f"{len(itunes_results)} results found for iTunes ID: {itunes_id}")
+        raise ValueError(
+            f"{len(itunes_results)} results found for iTunes ID: {itunes_id}"
+        )
     matching_podcast = itunes_results[0]
-    artwork_key = next((key for key in matching_podcast.keys() if key.startswith("artworkUrl")), None)
+    artwork_key = next(
+        (key for key in matching_podcast.keys() if key.startswith("artworkUrl")), None
+    )
     if artwork_key is None:
         raise ValueError(f"iTunes ID missing artwork: {itunes_id}")
     # even if a 3000x3000 artwork isn't available, it will return the highest available resolution. 3000x3000 is the max
     # allowed
-    return transform_artwork_url(matching_podcast[artwork_key], new_height=3000, new_width=3000)
+    return transform_artwork_url(
+        matching_podcast[artwork_key], new_height=3000, new_width=3000
+    )
 
 
 def leniently_validate_youtube_id(potential_youtube_id: str) -> bool:
@@ -41,13 +49,21 @@ def leniently_validate_youtube_id(potential_youtube_id: str) -> bool:
 
 
 def escape_for_xml(unescaped_string: str):
-    return escape(unescaped_string, entities={
-        "'": "&apos;",
-        '"': "&quot;",
-        "©": "&#xA9;",
-        "℗": "&#x2117;",
-        "™": "&#x2122;"
-    })
+    return escape(
+        unescaped_string,
+        entities={
+            "'": "&apos;",
+            '"': "&quot;",
+            "©": "&#xA9;",
+            "℗": "&#x2117;",
+            "™": "&#x2122;",
+        },
+    )
 
 
-__all__ = ["YoutubePlaylistEpisodeFeed", "leniently_validate_youtube_id", "escape_for_xml", "get_itunes_artwork"]
+__all__ = [
+    "YoutubePlaylistEpisodeFeed",
+    "leniently_validate_youtube_id",
+    "escape_for_xml",
+    "get_itunes_artwork",
+]

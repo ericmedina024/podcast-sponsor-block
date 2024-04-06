@@ -67,7 +67,7 @@ def parse_podcast_configs(config_path: Path) -> dict[str, PodcastConfig]:
             description=section_values.get("description"),
             itunes_category=section_values.get("itunes_category"),
             explicit=section_values.getboolean("explicit"),
-            itunes_id=section_values.get("itunes_id")
+            itunes_id=section_values.get("itunes_id"),
         )
     return podcast_configs
 
@@ -92,7 +92,7 @@ def populate_service_config(source: MutableMapping) -> ServiceConfig:
             trusted_hosts=parse_comma_seperated_value(
                 source.get("PODCAST_TRUSTED_HOSTS", None)
             ),
-            podcast_configs=parse_podcast_configs(data_path / "podcasts.ini")
+            podcast_configs=parse_podcast_configs(data_path / "podcasts.ini"),
         )
     except KeyError as exception:
         # noinspection PyUnresolvedReferences
