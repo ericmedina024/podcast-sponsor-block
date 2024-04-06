@@ -166,7 +166,9 @@ class YoutubePlaylistEpisodeFeed:
 
     @property
     def logo(self) -> str:
-        return get_logo_cached(self.youtube_client, self.feed_options, self.playlist_details)
+        return get_logo_cached(
+            self.youtube_client, self.feed_options, self.playlist_details
+        )
 
     @property
     def episodes(self) -> Sequence[EpisodeDetails]:

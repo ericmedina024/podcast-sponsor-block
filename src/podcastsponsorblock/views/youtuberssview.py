@@ -17,7 +17,12 @@ from flask import (
 )
 from flask.views import MethodView
 
-from ..helpers import YoutubePlaylistEpisodeFeed, leniently_validate_youtube_id, escape_for_xml, get_itunes_artwork
+from ..helpers import (
+    YoutubePlaylistEpisodeFeed,
+    leniently_validate_youtube_id,
+    escape_for_xml,
+    get_itunes_artwork,
+)
 from ..models import EpisodeDetails, ServiceConfig, FeedOptions
 
 
@@ -55,13 +60,19 @@ def add_host(url: str, generator_options: FeedOptions) -> str:
     return url
 
 
+def is_valid_description(description: Optional[str]) -> bool:
+    return description is not None and description != "" and not description.isspace()
+
 def generate_episode_entry(
     episode: EpisodeDetails, generator_options: FeedOptions
 ) -> FeedEntry:
     feed_entry = FeedEntry()
     feed_entry.id(episode.id)
     feed_entry.title(episode.title)
-    feed_entry.description(episode.description)
+    if is_valid_description(episode.description):
+        feed_entry.description(episode.description)
+    else:
+        feed_entry.description("No description available")
     feed_entry.published(episode.published_at)
     if generator_options.service_config.append_auth_param_to_resource_links:
         feed_entry.enclosure(
@@ -69,12 +80,14 @@ def generate_episode_entry(
                 url=add_host(
                     url_for(
                         # Apple podcasts requires the file extension
-                        "youtube_media_view", video_id=f"{episode.id}.m4a", key=generator_options.service_config.auth_key
+                        "youtube_media_view",
+                        video_id=f"{episode.id}.m4a",
+                        key=generator_options.service_config.auth_key,
                     ),
-                    generator_options
+                    generator_options,
                 ),
                 type="audio/x-m4a",  # Apple podcasts requires this instead of audio/mp4
-                length="0"
+                length="0",
             )
         )
     else:
@@ -82,18 +95,18 @@ def generate_episode_entry(
             **Enclosure(
                 url=add_host(
                     # Apple podcasts requires the file extension
-                    url_for("youtube_media_view", video_id=f"{episode.id}.m4a"), generator_options
+                    url_for("youtube_media_view", video_id=f"{episode.id}.m4a"),
+                    generator_options,
                 ),
                 type="audio/mp4",  # Apple podcasts requires this instead of audio/mp4
-                length="0"
+                length="0",
             )
         )
     return feed_entry
 
 
 def populate_feed_generator(
-    playlist_episode_feed: YoutubePlaylistEpisodeFeed,
-    generator_options: FeedOptions
+    playlist_episode_feed: YoutubePlaylistEpisodeFeed, generator_options: FeedOptions
 ) -> FeedGenerator:
     playlist_details = playlist_episode_feed.playlist_details
     feed_generator = FeedGenerator()
@@ -127,12 +140,16 @@ def populate_feed_generator(
         if podcast_config.language is not None:
             feed_generator.language(escape_for_xml(podcast_config.language))
         if podcast_config.explicit is not None:
-            podcast_feed_generator.itunes_explicit("yes" if podcast_config.explicit else "no")
+            podcast_feed_generator.itunes_explicit(
+                "yes" if podcast_config.explicit else "no"
+            )
         if podcast_config.itunes_category is not None:
-            podcast_feed_generator.itunes_category(escape_for_xml(podcast_config.itunes_category))
-    if podcast_config is not None and podcast_config.description is not None:
+            podcast_feed_generator.itunes_category(
+                escape_for_xml(podcast_config.itunes_category)
+            )
+    if podcast_config is not None and is_valid_description(podcast_config.description):
         feed_generator.subtitle(escape_for_xml(podcast_config.description))
-    elif playlist_details.description is not None:
+    elif is_valid_description(playlist_details.description):
         feed_generator.subtitle(escape_for_xml(playlist_details.description))
     else:
         feed_generator.subtitle("No description available")
@@ -142,7 +159,9 @@ def populate_feed_generator(
 
 @cached(
     TTLCache(maxsize=1024, ttl=timedelta(minutes=60).total_seconds()),
-    key=lambda episode_feed, generator_options: hashkey(episode_feed.playlist_details.id, generator_options.host),
+    key=lambda episode_feed, generator_options: hashkey(
+        episode_feed.playlist_details.id, generator_options.host
+    ),
 )
 def generate_rss_feed(
     episode_feed: YoutubePlaylistEpisodeFeed, generator_options: FeedOptions
@@ -169,7 +188,9 @@ class YoutubeRSSView(MethodView):
             )
         except ValueError:
             return Response("Playlist does not exist", status=400)
-        podcast_config = service_config.podcast_configs.get(episode_feed.playlist_details.id)
+        podcast_config = service_config.podcast_configs.get(
+            episode_feed.playlist_details.id
+        )
         feed_options.podcast_config = podcast_config
         if len(service_config.trusted_hosts) < 1:
             feed_options.host = ""
