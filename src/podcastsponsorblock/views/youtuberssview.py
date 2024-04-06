@@ -132,7 +132,7 @@ def populate_feed_generator(
             podcast_feed_generator.itunes_category(escape_for_xml(podcast_config.itunes_category))
     if podcast_config is not None and podcast_config.description is not None:
         feed_generator.subtitle(escape_for_xml(podcast_config.description))
-    elif playlist_details.description is not None:
+    elif playlist_details.description is not None and playlist_details.description:
         feed_generator.subtitle(escape_for_xml(playlist_details.description))
     else:
         feed_generator.subtitle("No description available")
