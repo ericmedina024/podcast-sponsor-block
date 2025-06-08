@@ -107,7 +107,7 @@ def log_service_config(config: ServiceConfig) -> None:
     logging.info(f"  - Categories to remove: {config.categories_to_remove}")
     logging.info(f"   - Podcast configs: {config.podcast_configs}")
     logging.info(
-        f"  - YouTube key: {'(configured)' if config.auth_key is not None else ''}"
+        f"  - YouTube key: {'(configured)' if config.youtube_api_key is not None else ''}"
     )
     logging.info(
         f"  - Auth key: {'(configured)' if config.auth_key is not None else ''}"
