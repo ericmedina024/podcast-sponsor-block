@@ -1,5 +1,6 @@
 import logging
 from datetime import timedelta
+from datetime import datetime
 from operator import attrgetter
 from typing import Iterable, Optional, Sequence, TYPE_CHECKING, Any, Callable, Hashable
 
@@ -92,6 +93,14 @@ def remove_unavailable_items(playlist_items: Sequence[dict]) -> Sequence[dict]:
     )
 
 
+def remove_young(playlist_items: Sequence[dict]) -> Sequence[dict]:
+    return tuple(
+        item
+        for item in playlist_items
+        if item["contentDetails"]["videoPublishedAt"] + timedelta(days=5) > datetime.datetime.now()
+    )
+
+
 def remove_duplicates(
     objects: Sequence[Any], key_getter: Callable[[Any], Hashable]
 ) -> Sequence[Any]:
@@ -123,7 +132,8 @@ def get_episodes_cached(
         )
         continue_requesting_playlist_items = playlist_items_request is not None
     sorted_playlist_episodes = sorted(
-        map(create_episode_details, remove_unavailable_items(all_playlist_items)),
+        map(create_episode_details, remove_young(
+            remove_unavailable_items(all_playlist_items))),
         key=attrgetter("published_at"),
     )
     return remove_duplicates(sorted_playlist_episodes, attrgetter("id"))
