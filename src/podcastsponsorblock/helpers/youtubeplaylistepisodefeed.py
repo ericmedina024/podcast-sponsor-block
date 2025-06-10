@@ -97,7 +97,7 @@ def remove_young(playlist_items: Sequence[dict]) -> Sequence[dict]:
     return tuple(
         item
         for item in playlist_items
-        if item["contentDetails"]["videoPublishedAt"] + timedelta(days=5) > datetime.datetime.now()
+        if item["contentDetails"]["videoPublishedAt"] + timedelta(days=5) > datetime.datetime.now() and
     )
 
 
