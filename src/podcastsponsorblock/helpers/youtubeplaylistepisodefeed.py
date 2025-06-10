@@ -1,6 +1,5 @@
 import logging
-from datetime import timedelta
-from datetime import datetime
+from datetime import timedelta, datetime, timezone
 from operator import attrgetter
 from typing import Iterable, Optional, Sequence, TYPE_CHECKING, Any, Callable, Hashable
 
@@ -97,7 +96,7 @@ def remove_young(playlist_items: Sequence[dict]) -> Sequence[dict]:
     return tuple(
         item
         for item in playlist_items
-        if item["contentDetails"]["videoPublishedAt"] + timedelta(days=5) > datetime.datetime.now() and
+        if parse_iso_date(item["contentDetails"]["videoPublishedAt"]) + timedelta(hours=6) < datetime.now(timezone.utc)
     )
 
 
