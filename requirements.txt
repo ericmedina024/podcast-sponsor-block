@@ -1,4 +1,4 @@
-yt_dlp
+yt-dlp>=2024.12.13
 google-api-python-client
 flask
 python-dateutil

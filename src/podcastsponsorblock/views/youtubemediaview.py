@@ -19,20 +19,100 @@ from ..models import ServiceConfig
 def download_m4a_audio(
     video_id: str, output_path: Path, categories_to_remove: Sequence[str]
 ):
-    youtube_dlp_options = {
-        "quiet": True,
-        "outtmpl": str(output_path.absolute().resolve()),
-        "format": "bestaudio[ext=m4a]",
-        "postprocessors": [
-            {"key": "SponsorBlock", "categories": categories_to_remove},
-            {
-                "key": "ModifyChapters",
-                "remove_sponsor_segments": categories_to_remove,
-            },
-        ],
-    }
-    with YoutubeDLP(youtube_dlp_options) as youtube_dlp_client:
-        youtube_dlp_client.download((f"https://www.youtube.com/watch?v={video_id}",))
+    # Try multiple strategies to handle YouTube's changing requirements
+    strategies = [
+        # Strategy 1: Web client only with comprehensive format fallbacks
+        {
+            "format": "bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio[ext=webm]/bestaudio[ext=opus]/bestaudio",
+            "extractor_args": {"youtube": {"player_client": ["web"]}},
+            "quiet": True,
+        },
+        # Strategy 2: Web client with simpler format selection
+        {
+            "format": "bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio",
+            "extractor_args": {"youtube": {"player_client": ["web"]}},
+            "quiet": True,
+        },
+        # Strategy 3: Any available audio format
+        {
+            "format": "bestaudio",
+            "extractor_args": {"youtube": {"player_client": ["web"]}},
+            "quiet": True,
+        },
+        # Strategy 4: Try with no specific client (let yt-dlp choose)
+        {
+            "format": "bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio[ext=webm]/bestaudio",
+            "quiet": True,
+        },
+        # Strategy 5: Most permissive - any format
+        {
+            "format": "bestaudio",
+            "quiet": True,
+        },
+        # Strategy 6: Force specific format with explicit output template
+        {
+            "format": "bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio[ext=webm]/bestaudio",
+            "quiet": True,
+            "outtmpl": "%(title)s.%(ext)s",
+        }
+    ]
+    
+    for i, strategy in enumerate(strategies):
+        # Create a temporary output path for this strategy
+        temp_output_path = output_path.parent / f"{output_path.stem}_temp_{i}{output_path.suffix}"
+        
+        youtube_dlp_options = {
+            "outtmpl": str(temp_output_path.absolute().resolve()),
+            "postprocessors": [
+                {"key": "SponsorBlock", "categories": categories_to_remove},
+                {
+                    "key": "ModifyChapters",
+                    "remove_sponsor_segments": categories_to_remove,
+                },
+            ],
+            # Add retry options for better reliability
+            "retries": 3,
+            "fragment_retries": 3,
+            "retry_sleep_functions": {"http": lambda n: min(4 ** n, 60)},
+            # Add timeout for better reliability
+            "socket_timeout": 30,
+        }
+        
+        # Merge strategy-specific options (but don't override outtmpl unless it's strategy 6)
+        if "outtmpl" in strategy:
+            # For strategy 6, we need to handle the custom output template differently
+            youtube_dlp_options.update(strategy)
+            # Override the outtmpl to use our temp path
+            youtube_dlp_options["outtmpl"] = str(temp_output_path.absolute().resolve())
+        else:
+            youtube_dlp_options.update(strategy)
+        
+        try:
+            logging.info(f"Trying download strategy {i+1}/{len(strategies)} for video {video_id}")
+            with YoutubeDLP(youtube_dlp_options) as youtube_dlp_client:
+                youtube_dlp_client.download((f"https://www.youtube.com/watch?v={video_id}",))
+                
+                # Check if the file was actually downloaded and has content
+                if temp_output_path.exists() and temp_output_path.stat().st_size > 0:
+                    # Move the temporary file to the final location
+                    temp_output_path.rename(output_path)
+                    logging.info(f"Successfully downloaded video {video_id} with strategy {i+1} (file size: {output_path.stat().st_size} bytes)")
+                    return  # Success, exit the function
+                else:
+                    logging.warning(f"Strategy {i+1} produced empty or missing file for video {video_id}")
+                    if temp_output_path.exists():
+                        temp_output_path.unlink()  # Clean up empty file
+                    raise DownloadError("Downloaded file is empty or missing")
+                    
+        except DownloadError as e:
+            logging.warning(f"Strategy {i+1} failed for video {video_id}: {e}")
+            # Clean up any temporary files
+            if temp_output_path.exists():
+                temp_output_path.unlink()
+            if i == len(strategies) - 1:  # Last attempt
+                logging.error(f"All download strategies failed for video {video_id}")
+                raise  # Re-raise the exception if all strategies failed
+            continue  # Try next strategy
 
 
 def validate_youtube_video_id(video_id: str, config: ServiceConfig) -> Optional[str]:
@@ -77,7 +157,6 @@ class YoutubeMediaView(MethodView):
                 return send_file(audio_output_path)
             except DownloadError as exception:
                 logging.exception(
-                    f"Failed to download audio for YouTube video {validated_video_id}",
-                    exception,
+                    f"Failed to download audio for YouTube video {validated_video_id}: {exception}"
                 )
                 return Response("Failed to download audio", status=500)
