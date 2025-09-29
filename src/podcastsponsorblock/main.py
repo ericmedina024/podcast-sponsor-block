@@ -16,6 +16,12 @@ def initialize_authorization(
 ) -> None:
     @app.before_request
     def require_authentication():
+        # Allow media endpoints without authentication for podcast apps
+        # Podcast apps like Overcast cannot handle authentication for media files
+        if request.endpoint in ['youtube_media_view', 'thumbnail_view']:
+            return
+        
+        # For RSS endpoints, require authentication
         if (
             allow_query_param_auth
             and request.args is not None
@@ -141,6 +147,20 @@ def create_app() -> Flask:
         host.removeprefix("http://").removeprefix("https://")
         for host in config.trusted_hosts
     )
+    
+    @app.route('/')
+    def index():
+        return {
+            "service": "Podcast Sponsor Block",
+            "version": "1.0.0",
+            "endpoints": {
+                "youtube_media": "/media/youtube/<video_id>",
+                "youtube_rss": "/rss/youtube/<playlist_id>", 
+                "thumbnail": "/thumbnail/<thumbnail_key>"
+            },
+            "description": "A service to remove sponsor segments from podcast RSS feeds"
+        }
+    
     app.add_url_rule(
         "/media/youtube/<string:video_id>",
         view_func=YoutubeMediaView.as_view("youtube_media_view"),
