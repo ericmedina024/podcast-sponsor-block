@@ -22,7 +22,7 @@ def transform_artwork_url(artwork_url: str, new_height: int, new_width: int) -> 
 @cached(cache=TTLCache(ttl=timedelta(minutes=60).total_seconds(), maxsize=1024))
 def get_itunes_artwork(itunes_id: str) -> str:
     itunes_response = requests.get(
-        "https://itunes.apple.com/lookup?id=", params={"id": itunes_id}
+        "https://itunes.apple.com/lookup?id=", params={"id": itunes_id}, timeout=30
     )
     if itunes_response.status_code != 200:
         raise ValueError(f"Invalid iTunes ID: {itunes_id}")
